@@ -119,15 +119,15 @@ double CPUCurl(std::vector<double> inputData[3], size_t dims[3],
                std::vector<double> &outValues) {
   Kokkos::Timer timer;
   size_t index = 0;
-  for (size_t k = 0; k < dims[2]; ++k) {
-    size_t next_k = std::max((size_t)0, k - 1),
-           prev_k = std::min(dims[2] - 1, k + 1);
-    for (size_t j = 0; j < dims[1]; ++j) {
-      size_t next_j = std::max((size_t)0, j - 1),
-             prev_j = std::min(dims[1] - 1, j + 1);
-      for (size_t i = 0; i < dims[0]; ++i) {
-        size_t next_i = std::max((size_t)0, i - 1),
-               prev_i = std::min(dims[0] - 1, i + 1);
+  for (int k = 0; k < dims[2]; ++k) {
+    size_t next_k = std::max(0, k - 1),
+           prev_k = std::min((int)dims[2] - 1, k + 1);
+    for (int j = 0; j < dims[1]; ++j) {
+      size_t next_j = std::max(0, j - 1),
+             prev_j = std::min((int)dims[1] - 1, j + 1);
+      for (int i = 0; i < dims[0]; ++i) {
+        size_t next_i = std::max(0, i - 1),
+               prev_i = std::min((int)dims[0] - 1, i + 1);
         // curl[0] = dv2 / dy - dv1 / dz
         outValues[3 * index] = (inputData[2][returnIndex(i, next_j, k, dims)] -
                                 inputData[2][returnIndex(i, prev_j, k, dims)]) /
