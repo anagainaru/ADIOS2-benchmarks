@@ -32,7 +32,7 @@ void GenerateData(std::vector<float> &simArray1, std::vector<float> &simArray2, 
             for (size_t k = 0; k < Nz; ++k)
             {
                 size_t idx = (i * Ny * Nz) + (j * Nz) + k;
-                auto value = generate_values(i, j, k, mode);
+                auto value = GenerateValues(i, j, k, mode);
                 simArray1[idx] = std::get<0>(value);
                 simArray2[idx] = std::get<1>(value);
                 simArray3[idx] = std::get<2>(value);
@@ -99,15 +99,14 @@ void AdiosTests(std::vector<float> simArray1, std::vector<float> simArray2, std:
     bpFileWriter.Put(VZ, simArray3.data());
     bpFileWriter.EndStep();
     bpFileWriter.Close();
-
-    return 0;
 }
 
 float KernelAdd(std::vector<float> inputData[3],
               std::vector<float> &outValues) {
   auto start = std::chrono::steady_clock::now();
   size_t dataSize = inputData[0].size();
-  for (auto &variable : inputData) {
+  for (size_t i=0; i<3; i++) {
+	auto variable = inputData[i];
     for (size_t i = 0; i < dataSize; i++) {
       outValues[i] = outValues[i] + variable[i];
     }
@@ -121,7 +120,8 @@ float KernelMagnitude(std::vector<float> inputData[3],
                     std::vector<float> &outValues) {
   auto start = std::chrono::steady_clock::now();
   size_t dataSize = inputData[0].size();
-  for (auto &variable : inputData) {
+  for (size_t i=0; i<3; i++) {
+	auto variable = inputData[i];
     for (size_t i = 0; i < dataSize; i++) {
       outValues[i] = outValues[i] + variable[i] * variable[i];
     }
@@ -138,8 +138,8 @@ inline size_t returnIndex(size_t x, size_t y, size_t z, size_t dims[3]) {
   return z + y * dims[2] + x * dims[2] * dims[1];
 }
 
-double KernelCurl(std::vector<double> inputData[3], size_t dims[3],
-               std::vector<double> &outValues) {
+double KernelCurl(std::vector<float> inputData[3], size_t dims[3],
+               std::vector<float> &outValues) {
   auto start = std::chrono::steady_clock::now();
   size_t index = 0;
   for (size_t k = 0; k < dims[2]; ++k) {
@@ -213,7 +213,7 @@ void KernelTests(std::vector<float> simArray1, std::vector<float> simArray2, std
         std::vector<float> destArray(size);
         auto timeAdd = KernelAdd(arrayList, destArray);
         forceCompute += destArray[0];
-        std::cout << "ADD" << Nx << " " << size << " " << timeAdd << std::endl;
+        std::cout << "ADD " << Nx << " " << size << " " << timeAdd << std::endl;
     }
 }
 
@@ -230,10 +230,10 @@ int main(int argc, char **argv) {
     if (dataGenerationMode == "random")
         GenerateRandomData(simArray1, simArray2, simArray3);
     else
-        GenerateData(simArray1, simArray2, simArray3, Nx, Ny, Nz, mode);
+        GenerateData(simArray1, simArray2, simArray3, Nx, Ny, Nz, dataGenerationMode);
     
-    AdiosTest(simArray1, simArray2, simArray3, Nx, Ny, Nz, "curl");
-    KernelTest(simArray1, simArray2, simArray3, Nx, Ny, Nz, "curl");
+    AdiosTests(simArray1, simArray2, simArray3, Nx, Ny, Nz, "all");
+    KernelTests(simArray1, simArray2, simArray3, Nx, Ny, Nz, "all");
   }
 
   return 0;
