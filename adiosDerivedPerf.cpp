@@ -105,8 +105,8 @@ float KernelAdd(std::vector<float> inputData[3],
               std::vector<float> &outValues) {
   auto start = std::chrono::steady_clock::now();
   size_t dataSize = inputData[0].size();
-  for (size_t i=0; i<3; i++) {
-	auto variable = inputData[i];
+  for (size_t array=0; array<3; array++) {
+	auto variable = inputData[array];
     for (size_t i = 0; i < dataSize; i++) {
       outValues[i] = outValues[i] + variable[i];
     }
@@ -120,8 +120,8 @@ float KernelMagnitude(std::vector<float> inputData[3],
                     std::vector<float> &outValues) {
   auto start = std::chrono::steady_clock::now();
   size_t dataSize = inputData[0].size();
-  for (size_t i=0; i<3; i++) {
-	auto variable = inputData[i];
+  for (size_t array=0; array<3; array++) {
+	auto variable = inputData[array];
     for (size_t i = 0; i < dataSize; i++) {
       outValues[i] = outValues[i] + variable[i] * variable[i];
     }

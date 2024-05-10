@@ -210,7 +210,7 @@ void default_tests(size_t size) {
   std::uniform_int_distribution<int> dist{1, 52};
 
   auto gen = [&dist, &mersenne_engine]() { return dist(mersenne_engine); };
-  for (size_t i = 1; i < 4; i++) {
+  for (size_t loop = 1; loop < 4; loop++) {
     std::vector<double> cpuData(size);
     std::generate(cpuData.begin(), cpuData.end(), gen);
     Kokkos::View<double *, Kokkos::HostSpace,
@@ -225,7 +225,7 @@ void default_tests(size_t size) {
     auto timeCPU = CPUMinMax(cpuData, statsCPU);
     if (statsGPU != statsCPU)
       std::cout << "DEBUG Error: value mismatch in minmax" << std::endl;
-    std::cout << "MinMax " << i << " "
+    std::cout << "MinMax " << loop << " "
               << (size * sizeof(double)) / (1024 * 1024) << " " << timeGPU
               << " " << timeCPU << std::endl;
 
@@ -235,7 +235,7 @@ void default_tests(size_t size) {
     timeCPU = CPUCopy(cpuData, destCPU);
     if (destGPU[0] != destCPU[0])
       std::cout << "DEBUG Error: value mismatch in copy" << std::endl;
-    std::cout << "Copy " << i << " " << (size * sizeof(double)) / (1024 * 1024)
+    std::cout << "Copy " << loop << " " << (size * sizeof(double)) / (1024 * 1024)
               << " " << timeGPU << " " << timeCPU << std::endl;
   }
 }
@@ -249,7 +249,7 @@ void derived_tests(size_t size, size_t numVar) {
   auto gen = [&dist, &mersenne_engine]() { return dist(mersenne_engine); };
   Kokkos::Random_XorShift64_Pool<> random_pool(/*seed=*/12345);
 
-  for (size_t i = 1; i < 4; i++) {
+  for (size_t loop = 1; loop < 4; loop++) {
     std::vector<std::vector<double>> cpuList;
     int sumElem = 0, magElem = 0;
     for (int var = 0; var < numVar; var++) {
@@ -265,7 +265,7 @@ void derived_tests(size_t size, size_t numVar) {
         gpuList("derivedBuf", size, numVar);
     Kokkos::parallel_for("initialize", size, KOKKOS_LAMBDA(int i) {
       auto generator = random_pool.get_state();
-      for (int j = 0; j < numVar; i++) {
+      for (int j = 0; j < numVar; j++) {
         gpuList(i, j) = generator.drand(0., 1.);
       }
       random_pool.free_state(generator);
@@ -278,17 +278,17 @@ void derived_tests(size_t size, size_t numVar) {
     auto timeCPU = CPUAdd(cpuList, destCPU);
     if (sumElem != destCPU[0])
       std::cout << "DEBUG Error: value mismatch in add" << std::endl;
-    std::cout << "Add " << i << " " << (size * sizeof(double)) / (1024 * 1024)
+    std::cout << "Add " << loop << " " << (size * sizeof(double)) / (1024 * 1024)
               << " " << timeGPU << " " << timeCPU << std::endl;
 
     timeGPU = GPUMagnitude(gpuList, destGPU);
     timeCPU = CPUMagnitude(cpuList, destCPU);
     if (magElem != destCPU[0])
       std::cout << "DEBUG Error: value mismatch in magnitude" << std::endl;
-    std::cout << "Magnitude " << i << " "
+    std::cout << "Magnitude " << loop << " "
               << (size * sizeof(double)) / (1024 * 1024) << " " << timeGPU
               << " " << timeCPU << std::endl;
-  }
+	}
 }
 
 void curl_tests(size_t dimx, size_t dimy, size_t dimz) {
@@ -302,7 +302,7 @@ void curl_tests(size_t dimx, size_t dimy, size_t dimz) {
   auto gen = [&dist, &mersenne_engine]() { return dist(mersenne_engine); };
   Kokkos::Random_XorShift64_Pool<> random_pool(/*seed=*/12345);
 
-  for (size_t i = 1; i < 4; i++) {
+  for (size_t loop = 1; loop < 4; loop++) {
     std::vector<double> cpuData1(size);
     std::vector<double> cpuData2(size);
     std::vector<double> cpuData3(size);
@@ -333,7 +333,7 @@ void curl_tests(size_t dimx, size_t dimy, size_t dimz) {
     auto timeGPU = GPUCurl(gpuData1, gpuData2, gpuData3, destGPU);
     auto timeCPU = CPUCurl(cpuList, dims, destCPU);
     std::cout << "DEBUG First curl value " << destCPU[0] << std::endl;
-    std::cout << "Curl " << i << " " << (size * sizeof(double)) / (1024 * 1024)
+    std::cout << "Curl " << loop << " " << (size * sizeof(double)) / (1024 * 1024)
               << " " << timeGPU << " " << timeCPU << dims[0] << dims[1]
               << dims[2] << std::endl;
   }
