@@ -70,7 +70,7 @@ void AdiosTests(std::vector<float> simArray1, std::vector<float> simArray2, std:
                                     "Vy =sim/VY \n"
                                     "Vz =sim/VZ \n"
                                     "curl(Vx,Vy,Vz)",
-                                    adios2::DerivedVarType::StoreData);
+                                    adios2::DerivedVarType::MetadataOnly);
     }
     if (derivedVar == "magnitude" || derivedVar == "all")
     {
@@ -79,7 +79,7 @@ void AdiosTests(std::vector<float> simArray1, std::vector<float> simArray2, std:
                                     "Vy =sim/VY \n"
                                     "Vz =sim/VZ \n"
                                     "magnitude(Vx,Vy,Vz)",
-                                    adios2::DerivedVarType::StoreData);
+                                    adios2::DerivedVarType::MetadataOnly);
     }
     if (derivedVar == "add" || derivedVar == "all")
     {
@@ -88,7 +88,7 @@ void AdiosTests(std::vector<float> simArray1, std::vector<float> simArray2, std:
                                     "Vy =sim/VY \n"
                                     "Vz =sim/VZ \n"
                                     "Vx + Vy + Vz",
-                                    adios2::DerivedVarType::StoreData);
+                                    adios2::DerivedVarType::MetadataOnly);
     }
     // clang-format on
     std::string filename = "TestDerived.bp";
@@ -141,42 +141,45 @@ inline size_t returnIndex(size_t x, size_t y, size_t z, size_t dims[3]) {
 
 double KernelCurl(std::vector<float> inputData[3], size_t dims[3],
                std::vector<float> &outValues) {
+  auto input1 = inputData[0];
+  auto input2 = inputData[1];
+  auto input3 = inputData[2];
   auto start = std::chrono::steady_clock::now();
   size_t index = 0;
-  for (int k = 0; k < dims[2]; ++k) {
-    size_t next_k = std::max(0, k - 1),
-           prev_k = std::min((int)dims[2] - 1, k + 1);
-    for (int j = 0; j < dims[1]; ++j) {
-      size_t next_j = std::max(0, j - 1),
-             prev_j = std::min((int)dims[1] - 1, j + 1);
-      for (int i = 0; i < dims[0]; ++i) {
-        size_t next_i = std::max(0, i - 1),
-               prev_i = std::min((int)dims[0] - 1, i + 1);
+    for (int i = 0; i < dims[0]; ++i)
+    {
+                size_t prev_i = std::max(0, i - 1), next_i = std::min((int)dims[0] - 1, i + 1);
+        for (int j = 0; j < dims[1]; ++j)
+        {
+            size_t prev_j = std::max(0, j - 1), next_j = std::min((int)dims[1] - 1, j + 1);
+            for (int k = 0; k < dims[2]; ++k)
+            {
+        size_t prev_k = std::max(0, k - 1), next_k = std::min((int)dims[2] - 1, k + 1);
         // curl[0] = dv2 / dy - dv1 / dz
-        outValues[3 * index] = (inputData[2][returnIndex(i, next_j, k, dims)] -
-                                inputData[2][returnIndex(i, prev_j, k, dims)]) /
+        outValues[3 * index] = (input3[returnIndex(i, next_j, k, dims)] -
+                                input3[returnIndex(i, prev_j, k, dims)]) /
                                (next_j - prev_j);
         outValues[3 * index] +=
-            (inputData[1][returnIndex(i, j, prev_k, dims)] -
-             inputData[1][returnIndex(i, j, next_k, dims)]) /
+            (input2[returnIndex(i, j, prev_k, dims)] -
+             input2[returnIndex(i, j, next_k, dims)]) /
             (next_k - prev_k);
         // curl[1] = dv0 / dz - dv2 / dx
         outValues[3 * index + 1] =
-            (inputData[0][returnIndex(i, j, next_k, dims)] -
-             inputData[0][returnIndex(i, j, prev_k, dims)]) /
+            (input1[returnIndex(i, j, next_k, dims)] -
+             input1[returnIndex(i, j, prev_k, dims)]) /
             (next_k - prev_k);
         outValues[3 * index + 1] +=
-            (inputData[2][returnIndex(prev_i, j, k, dims)] -
-             inputData[2][returnIndex(next_i, j, k, dims)]) /
+            (input3[returnIndex(prev_i, j, k, dims)] -
+             input3[returnIndex(next_i, j, k, dims)]) /
             (next_i - prev_i);
         // curl[2] = dv1 / dx - dv0 / dy
         outValues[3 * index + 2] =
-            (inputData[1][returnIndex(next_i, j, k, dims)] -
-             inputData[1][returnIndex(prev_i, j, k, dims)]) /
+            (input2[returnIndex(next_i, j, k, dims)] -
+             input2[returnIndex(prev_i, j, k, dims)]) /
             (next_i - prev_i);
         outValues[3 * index + 2] +=
-            (inputData[0][returnIndex(i, prev_j, k, dims)] -
-             inputData[0][returnIndex(i, next_j, k, dims)]) /
+            (input1[returnIndex(i, prev_j, k, dims)] -
+             input1[returnIndex(i, next_j, k, dims)]) /
             (next_j - prev_j);
         index++;
       }
@@ -221,7 +224,7 @@ void KernelTests(std::vector<float> simArray1, std::vector<float> simArray2, std
 int main(int argc, char **argv) {
   size_t numVar = 3;
   std::string dataGenerationMode = "linear";
-  std::vector<size_t> dim_list = {254, 309, 320, 358, 366, 374, 382, 389, 403};
+  std::vector<size_t> dim_list = {320, 358, 366, 374, 382, 389, 403, 471, 594, 650};
 
   for (const size_t &dim : dim_list) {
     size_t Nx = dim, Ny = dim, Nz = dim;
@@ -234,7 +237,9 @@ int main(int argc, char **argv) {
         GenerateData(simArray1, simArray2, simArray3, Nx, Ny, Nz, dataGenerationMode);
     
     std::cout << "Starting ADIOS tests for dimension " << dim << std::endl;
-    AdiosTests(simArray1, simArray2, simArray3, Nx, Ny, Nz, "all");
+    AdiosTests(simArray1, simArray2, simArray3, Nx, Ny, Nz, "add");
+    AdiosTests(simArray1, simArray2, simArray3, Nx, Ny, Nz, "magnitude");
+    AdiosTests(simArray1, simArray2, simArray3, Nx, Ny, Nz, "curl");
     std::cout << "End ADIOS tests" << std::endl;
     std::cout << "Starting Kernel tests for dimension " << dim << std::endl;
     KernelTests(simArray1, simArray2, simArray3, Nx, Ny, Nz, "all");

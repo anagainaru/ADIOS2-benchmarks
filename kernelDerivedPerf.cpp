@@ -49,9 +49,10 @@ double GPUMagnitude(
   int numVar = data.extent(1);
   Kokkos::parallel_for("magnitude", size, KOKKOS_LAMBDA(int i) {
     dest(i) = 0;
-    for (int j = 0; j < size; j++) {
+    for (int j = 0; j < numVar; j++) {
       dest(i) += data(i, j) * data(i, j);
     }
+    dest(i) = sqrt(dest(i));
   });
   Kokkos::fence();
   return timer.seconds();
@@ -63,7 +64,7 @@ double CPUMagnitude(std::vector<std::vector<double>> inputData,
   size_t dataSize = inputData[0].size();
   for (auto &variable : inputData) {
     for (size_t i = 0; i < dataSize; i++) {
-      outValues[i] = outValues[i] + variable[i] * variable[i];
+      outValues[i] += variable[i] * variable[i];
     }
   }
   for (size_t i = 0; i < dataSize; i++) {
@@ -117,42 +118,45 @@ inline size_t returnIndex(size_t x, size_t y, size_t z, size_t dims[3]) {
 
 double CPUCurl(std::vector<double> inputData[3], size_t dims[3],
                std::vector<double> &outValues) {
+  auto input1 = inputData[0];
+  auto input2 = inputData[1];
+  auto input3 = inputData[2];
   Kokkos::Timer timer;
   size_t index = 0;
-  for (int k = 0; k < dims[2]; ++k) {
-    size_t next_k = std::max(0, k - 1),
-           prev_k = std::min((int)dims[2] - 1, k + 1);
-    for (int j = 0; j < dims[1]; ++j) {
-      size_t next_j = std::max(0, j - 1),
-             prev_j = std::min((int)dims[1] - 1, j + 1);
-      for (int i = 0; i < dims[0]; ++i) {
-        size_t next_i = std::max(0, i - 1),
-               prev_i = std::min((int)dims[0] - 1, i + 1);
+    for (int i = 0; i < dims[0]; ++i)
+    {
+                size_t prev_i = std::max(0, i - 1), next_i = std::min((int)dims[0] - 1, i + 1);
+        for (int j = 0; j < dims[1]; ++j)
+        {
+            size_t prev_j = std::max(0, j - 1), next_j = std::min((int)dims[1] - 1, j + 1);
+            for (int k = 0; k < dims[2]; ++k)
+            {
+        size_t prev_k = std::max(0, k - 1), next_k = std::min((int)dims[2] - 1, k + 1);
         // curl[0] = dv2 / dy - dv1 / dz
-        outValues[3 * index] = (inputData[2][returnIndex(i, next_j, k, dims)] -
-                                inputData[2][returnIndex(i, prev_j, k, dims)]) /
+        outValues[3 * index] = (input3[returnIndex(i, next_j, k, dims)] -
+                                input3[returnIndex(i, prev_j, k, dims)]) /
                                (next_j - prev_j);
         outValues[3 * index] +=
-            (inputData[1][returnIndex(i, j, prev_k, dims)] -
-             inputData[1][returnIndex(i, j, next_k, dims)]) /
+            (input2[returnIndex(i, j, prev_k, dims)] -
+             input2[returnIndex(i, j, next_k, dims)]) /
             (next_k - prev_k);
         // curl[1] = dv0 / dz - dv2 / dx
         outValues[3 * index + 1] =
-            (inputData[0][returnIndex(i, j, next_k, dims)] -
-             inputData[0][returnIndex(i, j, prev_k, dims)]) /
+            (input1[returnIndex(i, j, next_k, dims)] -
+             input1[returnIndex(i, j, prev_k, dims)]) /
             (next_k - prev_k);
         outValues[3 * index + 1] +=
-            (inputData[2][returnIndex(prev_i, j, k, dims)] -
-             inputData[2][returnIndex(next_i, j, k, dims)]) /
+            (input3[returnIndex(prev_i, j, k, dims)] -
+             input3[returnIndex(next_i, j, k, dims)]) /
             (next_i - prev_i);
         // curl[2] = dv1 / dx - dv0 / dy
         outValues[3 * index + 2] =
-            (inputData[1][returnIndex(next_i, j, k, dims)] -
-             inputData[1][returnIndex(prev_i, j, k, dims)]) /
+            (input2[returnIndex(next_i, j, k, dims)] -
+             input2[returnIndex(prev_i, j, k, dims)]) /
             (next_i - prev_i);
         outValues[3 * index + 2] +=
-            (inputData[0][returnIndex(i, prev_j, k, dims)] -
-             inputData[0][returnIndex(i, next_j, k, dims)]) /
+            (input1[returnIndex(i, prev_j, k, dims)] -
+             input1[returnIndex(i, next_j, k, dims)]) /
             (next_j - prev_j);
         index++;
       }
@@ -251,7 +255,7 @@ void derived_tests(size_t size, size_t numVar) {
 
   for (size_t loop = 1; loop < 4; loop++) {
     std::vector<std::vector<double>> cpuList;
-    int sumElem = 0, magElem = 0;
+    double sumElem = 0, magElem = 0;
     for (int var = 0; var < numVar; var++) {
       std::vector<double> cpuData(size);
       std::generate(cpuData.begin(), cpuData.end(), gen);
@@ -341,7 +345,7 @@ void curl_tests(size_t dimx, size_t dimy, size_t dimz) {
 
 int main(int argc, char **argv) {
   size_t numVar = 3;
-  std::vector<size_t> dim_list = {254, 309, 320, 358, 366, 374, 382, 389, 403};
+  std::vector<size_t> dim_list = {320, 358, 366, 374, 382, 389, 403, 471, 594, 650};
 
   Kokkos::initialize(argc, argv);
   using MemSpace = Kokkos::DefaultExecutionSpace::memory_space;
