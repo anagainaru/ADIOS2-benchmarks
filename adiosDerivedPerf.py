@@ -5,6 +5,7 @@ import adios2.bindings as adios2
 
 supportedExpr = ["add", "multiply", "magnitude", "curl"]
 numSteps = 100
+derivedName = "derived"
 
 # generate random dataset
 # nElem dimensions of the array [n1, n2, n3] for 3D arrays
@@ -63,7 +64,7 @@ def write_with_derived(fileName, expression, type_write, listArrays):
             "var"+str(cnt), var, var.shape, [0]*len(var.shape), var.shape))
     # add the derived variable
     if expression == "add":
-        ioWriter.DefineDerivedVariable("derived", "a=var1\nb=var2\na+b",
+        ioWriter.DefineDerivedVariable(derivedName, "a=var1\nb=var2\na+b",
                                        type_write)
     elif expression == "multiply":
         ioWriter.DefineDerivedVariable("derived", "a=var1\nb=var2\na*b",
@@ -87,8 +88,24 @@ def write_with_derived(fileName, expression, type_write, listArrays):
 # read variables written by the write_with_derived function
 # from a bp file for derived variables
 # returns: average time it took to read one step
-def read_with_derived(fileName, listArrays):
-    return 0
+def read_with_derived(fileName, shape):
+    adios = adios2.ADIOS()
+    ioReader = adios.DeclareIO("derivedReader")
+    ts = []
+    rStream = ioReader.Open(fileName, adios2.Mode.Read)
+    for step in range(numSteps):
+        buffer = np.zeros(shape=shape)
+        start_ts = time.time()
+        rStream.BeginStep()
+        adiosVar = ioReader.InquireVariable(derivedName)
+        rStream.Get(adiosVar, buffer)
+        rStream.EndStep()
+        end_ts = time.time()
+        if step > 10: # skip warm-up steps
+            ts.append(end_ts - start_ts)
+    rStream.Close()
+
+    return np.mean(ts)
 
 # filter the datasets so it contain the number of variables expected by the 
 # expression (e.g. magnitude will need 3 etc)
@@ -153,3 +170,6 @@ if __name__ == '__main__':
     ts_write = write_with_derived("out_%s.bp" %(args.testName), args.expression,
                        adios2.DerivedVarType.StatsOnly, dataset)
     print("Time to write expression:", ts_write)
+
+    ts_read = read_with_derived("out_%s.bp" %(args.testName), dataset[0].shape)
+    print("Time to read expression:", ts_read)
