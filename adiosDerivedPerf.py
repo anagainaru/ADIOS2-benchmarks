@@ -1,9 +1,10 @@
 import numpy as np
 import time
 import argparse
+from adios2 import FileReader
 import adios2.bindings as adios2
 
-supportedExpr = ["add", "multiply", "magnitude", "curl"]
+supportedExpr = ["add", "multiply", "magnitude"]
 numSteps = 100
 derivedName = "derived"
 
@@ -27,7 +28,13 @@ def generante_dataset(nElem, nVar, seed):
 # listVarNames a list of adios variables
 # returns: the same as generate_datase
 def read_dataset(fileName, listVarNames):
-    return []
+    data = []
+    with FileReader(fileName) as ibpFile:
+        for varName in listVarNames:
+            buffer = ibpFile.read(varName)
+            data.append(buffer)
+        print("Reading variable %s shape %s" %(varName, buffer.shape))
+    return data
 
 # applies a given expression using numpy logic
 # returns: average time it took to apply the expression once
@@ -35,16 +42,24 @@ def apply_expression(expression, listArrays):
     print("Apply %s on the dataset" %(expression))
     ts = []
     for step in range(numSteps):
+        res = np.zeros(listArrays[0].shape)
+        if expression == "multiply":
+            res = np.ones(listArrays[0].shape)
         start_ts = time.time()
         if expression == "add":
-            res = np.zeros(listArrays[0].shape)
-            # add all numpy arrays in the list
             for var in listArrays:
                 res = res + var
+        elif expression == "multiply":
+            for var in listArrays:
+                res = res * var
+        elif expression == "magnitude":
+            for var in listArrays:
+                res = res + (var * var)
+            res = np.sqrt(res)
         end_ts = time.time()
         if step > 10:
             ts.append(end_ts - start_ts)
-    return np.mean(ts)
+    return res, np.mean(ts)
 
 # write a bp file asking for the expression to be
 # computed on the fly by ADIOS
@@ -69,6 +84,11 @@ def write_with_derived(fileName, expression, type_write, listArrays):
     elif expression == "multiply":
         ioWriter.DefineDerivedVariable("derived", "a=var1\nb=var2\na*b",
                                        type_write)
+    elif expression == "magnitude":
+        ioWriter.DefineDerivedVariable(
+                "derived", "a=var1\nb=var2\nc=var3\nmagnitude(a,b,c)",
+                type_write)
+
     wStream = ioWriter.Open(fileName, adios2.Mode.Write)
     for step in range(numSteps):
         start_ts = time.time()
@@ -82,7 +102,6 @@ def write_with_derived(fileName, expression, type_write, listArrays):
         if step > 10: # skip warm-up steps
             ts.append(end_ts - start_ts)
     wStream.Close()
-
     return np.mean(ts)
 
 # read variables written by the write_with_derived function
@@ -104,8 +123,7 @@ def read_with_derived(fileName, shape):
         if step > 10: # skip warm-up steps
             ts.append(end_ts - start_ts)
     rStream.Close()
-
-    return np.mean(ts)
+    return buffer, np.mean(ts)
 
 # filter the datasets so it contain the number of variables expected by the 
 # expression (e.g. magnitude will need 3 etc)
@@ -120,7 +138,7 @@ def filter_dataset(dataset, expression):
                 expression))
             exit()
         return dataset[:2]
-    if expression == "magnitude" or expression == "curl":
+    if expression == "magnitude":
         if len(dataset) < 3:
             print("The expression used (%s) needs to have at least three variables" %(
                 expression))
@@ -162,14 +180,24 @@ if __name__ == '__main__':
         dataset = generante_dataset(args.size, args.numvars, args.randseed)
         print("Generated a dataset of %d variables of shape %s" %(
             len(dataset), dataset[0].shape))
+    elif args.file != 'n/a': # if we are reading the data from a file
+        dataset = read_dataset(args.file, args.variables)
+    else:
+        print("ERR There is no option chosen for generating data."
+              "Use either -s (random arrays) or -f (data from a file)")
+        exit()
 
     dataset = filter_dataset(dataset, args.expression)
-    ts_apply = apply_expression(args.expression, dataset)
+    res_apply, ts_apply = apply_expression(args.expression, dataset)
     print("Time to apply expression:", ts_apply)
 
     ts_write = write_with_derived("out_%s.bp" %(args.testName), args.expression,
                        adios2.DerivedVarType.StatsOnly, dataset)
     print("Time to write expression:", ts_write)
 
-    ts_read = read_with_derived("out_%s.bp" %(args.testName), dataset[0].shape)
+    res_read, ts_read = read_with_derived("out_%s.bp" %(args.testName),
+                                          dataset[0].shape)
     print("Time to read expression:", ts_read)
+
+    if not np.allclose(res_apply, res_read, rtol=1e-03):
+        print("ERR Correctness test failed")
